@@ -270,6 +270,7 @@ def main(args_dict):
         log_memory_usage("CONFIG_LOADED", debug_mode)
 
         db_host = config["MATOMO_DB"]["HOST"] 
+        db_port = int(config["MATOMO_DB"].get("PORT", "3306"))
         db_username = config["MATOMO_DB"]["USERNAME"] 
         db_passwd = config["MATOMO_DB"]["PASSWORD"] 
         db_database = config["MATOMO_DB"]["DATABASE"] 
@@ -283,7 +284,8 @@ def main(args_dict):
         s3logger.loginfo("Starting procesing on datetime: %s site: %s year: %s month: %s day: %s" % ( datetime.datetime.now(), site, year, month, day))
         emit_progress(
             f"Starting processing site={site} year={year} month={month} day={day} "
-            f"matomo_host={db_host} visits_path=s3://{s3_visits_bucket} events_path=s3://{s3_events_bucket}"
+            f"matomo_host={db_host}:{db_port} visits_path=s3://{s3_visits_bucket} "
+            f"events_path=s3://{s3_events_bucket}"
         )
 
 
@@ -297,6 +299,7 @@ def main(args_dict):
     # Prepare connection parameters (connection created per data type for SSCursor)
     conn_params = {
         'host': db_host,
+        'port': db_port,
         'user': db_username,
         'passwd': db_passwd,
         'db': db_database,

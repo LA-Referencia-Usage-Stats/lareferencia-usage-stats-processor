@@ -18,7 +18,8 @@ class S3ParquetInputStage(AbstractUsageStatsPipelineStage):
         self.COUNTRY_LABEL = configContext.getLabel('COUNTRY')
         self.OAI_IDENTIFIER_LABEL = configContext.getLabel('OAI_IDENTIFIER')
 
-        self.usage_stats_db_uri = configContext.getConfig('USAGE_STATS_DB','SQLALCHEMY_DATABASE_URI')
+        # Keep a printable DB URI reference for diagnostics, regardless of ini format.
+        self.usage_stats_db_uri = str(configContext.getDBHelper().engine.url)
 
         self.db_helper = configContext.getDBHelper()
 
