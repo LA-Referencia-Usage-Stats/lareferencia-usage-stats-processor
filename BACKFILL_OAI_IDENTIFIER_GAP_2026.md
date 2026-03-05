@@ -30,7 +30,7 @@ Con eso:
 
 - No sobrescribir valores existentes en `custom_var_v1` durante update final.
 - Tratar mapeo por clave compuesta `(idsite, idaction_url)`, no solo `idaction_url`.
-- Marcar como ambiguo si un mismo `(idsite, idaction_url)` produce mas de un identificador candidato.
+- Se asume input deduplicado por `(idsite, idaction_url)` desde export; no se valida ambiguedad en runtime.
 - Dejar casos no resolubles para revision manual (sin inventar identificador).
 
 ## 4. Solucion implementada (offline)
@@ -64,6 +64,12 @@ Algoritmo:
 3. Construye candidato `oai_identifier`.
 4. Evalua estado de cada fila.
 5. Deduplica updates por `(idsite, idaction_url, reconstructed_oai_identifier)`.
+6. Genera script SQL para aplicar update por `JOIN` en Matomo.
+
+Implementacion de performance:
+- Se asume que el input de eventos ya viene deduplicado por `(idsite,idaction_url)` desde el export.
+- El script procesa en una pasada de clasificacion y usa SQLite temporal para contadores/salidas sin crecer RAM.
+- El progreso se reporta cada N filas (`--progress-every`).
 
 Estados producidos:
 - `reconstructed`
@@ -71,7 +77,6 @@ Estados producidos:
 - `existing_mismatch`
 - `missing_prefix`
 - `unresolved_url`
-- `ambiguous_action_mapping`
 
 ## 5. Uso del script
 
@@ -104,6 +109,16 @@ Opciones utiles:
   - `--events-current-oai-col`
   - `--prefix-site-col`
   - `--prefix-value-col`
+- Escalabilidad:
+  - `--temp-db-path` para fijar archivo SQLite temporal
+  - `--progress-every`
+- SQL de aplicacion:
+  - `--out-sql-update`
+  - `--sql-target-table`
+  - `--sql-target-column`
+  - `--sql-date-from`
+  - `--sql-date-to`
+  - `--sql-null-only`
 
 ## 6. Artefactos de salida y para que sirven
 
@@ -117,6 +132,8 @@ Opciones utiles:
 - `backfill_missing_prefix_sites.csv`
   - Lista deduplicada de `idsite` sin `identifier_prefix` declarado.
   - Incluye conteo de filas afectadas y cantidad de `idaction_url` distintos.
+- `backfill_oai_apply_updates.sql`
+  - SQL listo para cargar `backfill_oai_updates_by_action.csv` y ejecutar `UPDATE ... JOIN`.
 
 ## 7. Estrategia de update en Matomo (fase posterior)
 
@@ -133,7 +150,7 @@ Importante:
 
 ## 8. Validaciones recomendadas (antes de actualizar)
 
-Chequeo de ambiguedad sobre datos historicos:
+Chequeo opcional de ambiguedad sobre datos historicos:
 
 ```sql
 SELECT idsite, idaction_url, COUNT(DISTINCT custom_var_v1) AS ids_distintos
@@ -158,14 +175,13 @@ Archivos clave:
 
 ## 10. Tareas pendientes para otro agente IA
 
-1. Agregar opcion de exportar SQL de update directamente desde el script.
-2. Implementar tabla de excepciones por `idsite` para patrones URL especiales.
-3. Agregar tests unitarios de extraccion de handle con URLs reales del gap.
-4. Agregar modo de lectura directa desde DB (Matomo + usage-db), manteniendo `--dry-run`.
-5. Construir reporte final de cobertura por sitio:
+1. Implementar tabla de excepciones por `idsite` para patrones URL especiales.
+2. Agregar tests unitarios de extraccion de handle con URLs reales del gap.
+3. Agregar modo de lectura directa desde DB (Matomo + usage-db), manteniendo `--dry-run`.
+4. Construir reporte final de cobertura por sitio:
    - `% reconstruido`
    - `% no resuelto`
-   - `% ambiguo`
+   - `% ambiguo` (si se reintroduce una capa de validacion de ambiguedad)
 
 ## 11. Riesgos conocidos
 
